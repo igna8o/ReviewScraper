@@ -36,10 +36,18 @@ Usar estos endpoints va contra los términos de servicio de Google. El código
 espera entre 1 y 3 segundos entre páginas. Si haces muchas peticiones, Google
 puede bloquear tu IP.
 
+## Integrarlo en un dashboard
+
+Ver [`docs/INTEGRACION_DASHBOARD.md`](docs/INTEGRACION_DASHBOARD.md): el cliente
+busca su negocio por nombre, ve sus reseñas al instante y, si quiere
+responderlas, conecta su cuenta de Google.
+
 ## Instalación
 
 ```bash
 pip install git+https://github.com/igna8o/ReviewScraper
+# o con Docker:
+docker build -t reviewscraper . && docker run -p 8000:8000 -e REVIEWSCRAPER_API_KEYS=... reviewscraper
 # o, para desarrollar:
 git clone https://github.com/igna8o/ReviewScraper && cd ReviewScraper
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'
@@ -70,7 +78,9 @@ Documentación interactiva en `http://localhost:8000/docs`.
 | Endpoint | Qué hace |
 |---|---|
 | `GET /maps/reviews-v3` | Lugares con sus reseñas en `reviews_data` |
-| `GET /maps/search-v3` | Lugares para una búsqueda de texto |
+| `GET /maps/search-v3` | Lugares para una búsqueda de texto (con scraping; desde la nube Google pide CAPTCHA) |
+| `GET /places/autocomplete` | Sugerencias de negocios mientras se escribe (API oficial de Places) |
+| `GET /places/details` | Un `place_id` convertido en lugar con su `google_id`, dirección y nota |
 | `GET /requests/{id}` | Resultado de una petición asíncrona (`Pending`, `Success` o `Error`) |
 | `GET /requests?type=running\|finished` | Historial |
 | `GET /health` | Comprobación de vida |
@@ -79,7 +89,7 @@ Parámetros de `/maps/reviews-v3` (mismos nombres que Outscraper):
 
 | Parámetro | Por defecto | Notas |
 |---|---|---|
-| `query` | — | Nombre, búsqueda, feature ID `0x..:0x..` o URL de Google Maps. Se puede repetir |
+| `query` | — | Feature ID `0x..:0x..`, URL de Google Maps, enlace `?cid=`, `cid:<número>`, `place_id` (`ChIJ...`, necesita `GOOGLE_PLACES_API_KEY`) o un nombre. Se puede repetir |
 | `reviewsLimit` | 10 | `0` = todas |
 | `limit` | 1 | Lugares por búsqueda |
 | `sort` | `most_relevant` | `newest`, `highest_rating`, `lowest_rating` |
@@ -112,6 +122,7 @@ Los resultados se guardan en SQLite y se borran 2 horas después de terminar.
 | `REVIEWSCRAPER_MIN_DELAY` / `MAX_DELAY` | `1` / `3` segundos entre páginas |
 | `REVIEWSCRAPER_PROXY` | sin proxy (p. ej. `http://user:pass@host:port`) |
 | `REVIEWSCRAPER_GOOGLE_BASE_URL` | `https://www.google.com` |
+| `GOOGLE_PLACES_API_KEY` | sin clave = `/places/*` y los `place_id` no funcionan |
 
 ### Cliente de Python para el servidor
 
@@ -167,5 +178,4 @@ pytest -m live    # contra Google de verdad (necesita internet)
   ninguna, así que no se sabe en qué posición viene. Tampoco los "me gusta".
 - Los lugares solo traen nombre y feature ID: todavía no se leen la dirección,
   la valoración media ni el teléfono de la respuesta de búsqueda.
-- `place_id` (`ChIJ...`) no se resuelve. Usa el nombre, la URL o el feature ID.
 - No hay reintentos con rotación de proxies ni panel web.

@@ -28,10 +28,13 @@ import random
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, AsyncIterator, Iterable
+from typing import TYPE_CHECKING, Any, AsyncIterator, Iterable
 
 
 from ..http import GoogleHTTP
+
+if TYPE_CHECKING:
+    from .places import PlacesAPI
 
 SEARCH_PATH = "/search"
 REVIEWS_PATH = "/httpservice/web/PrivateLocalSearchUiDataService/GetLocalBoqProxy"
@@ -54,6 +57,9 @@ SORTS = {
 
 FEATURE_ID_RE = re.compile(r"0x[0-9a-f]+:0x[0-9a-f]+", re.IGNORECASE)
 CONTRIB_ID_RE = re.compile(r"/contrib/(\d+)")
+# ?cid=123 in Maps links and in the Places API's googleMapsUri; ludocid= in Search links.
+CID_RE = re.compile(r"(?:[?&](?:cid|ludocid)=|^cid:)(\d+)", re.IGNORECASE)
+PLACE_ID_RE = re.compile(r"^(?:place_id:)?(Ch[A-Za-z0-9_-]{10,})$")
 
 
 class FormatChanged(RuntimeError):
@@ -65,14 +71,32 @@ class Place:
     google_id: str
     name: str = ""
     query: str = ""
+    place_id: str | None = None
+    cid: str | None = None
+    full_address: str | None = None
+    rating: float | None = None
+    reviews: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "query": self.query,
             "name": self.name,
             "google_id": self.google_id,
             "location_link": f"https://www.google.com/maps/place/data=!4m2!3m1!1s{self.google_id}",
         }
+        for key in ("place_id", "cid", "full_address", "rating", "reviews"):
+            value = getattr(self, key)
+            if value is not None:
+                out[key] = value
+        return out
+
+
+def cid_to_feature_id(cid: str | int) -> str:
+    """The review endpoint accepts ``0x0:0x<CID in hex>`` as a feature ID.
+
+    Verified live on 2026-11-03: it returned the same reviews as the full ID.
+    """
+    return f"0x0:{int(cid):#x}"
 
 
 # --------------------------------------------------------------------------- #
@@ -196,9 +220,16 @@ def _review_from_record(record: list, page_token: str) -> dict[str, Any]:
 
 
 def resolve_feature_id(query: str) -> str | None:
-    """Return the feature ID if the query is one, or a Maps URL containing one."""
+    """Return a feature ID for a query that carries one.
+
+    Accepts a feature ID, a Maps URL containing one, a link with ``?cid=`` or
+    ``ludocid=``, or ``cid:<number>``.
+    """
     match = FEATURE_ID_RE.search(query)
-    return match.group(0).lower() if match else None
+    if match:
+        return match.group(0).lower()
+    match = CID_RE.search(query.strip())
+    return cid_to_feature_id(match.group(1)) if match else None
 
 
 # --------------------------------------------------------------------------- #
@@ -227,13 +258,18 @@ class GoogleMaps:
     """Search Google Maps places and read their reviews."""
 
     def __init__(self, http: GoogleHTTP | None = None,
-                 min_delay: float = 1.0, max_delay: float = 3.0):
+                 min_delay: float = 1.0, max_delay: float = 3.0,
+                 places: "PlacesAPI | None" = None):
         self.http = http or GoogleHTTP()
         self.min_delay = min_delay
         self.max_delay = max(max_delay, min_delay)
+        # Official Places API, used for place IDs (ChIJ...) when a key is set.
+        self.places = places
 
     async def aclose(self) -> None:
         await self.http.aclose()
+        if self.places:
+            await self.places.aclose()
 
     async def search(self, query: str, language: str = "en",
                      region: str | None = None, limit: int = 20) -> list[Place]:
@@ -251,6 +287,13 @@ class GoogleMaps:
         fid = resolve_feature_id(query)
         if fid:
             return [Place(google_id=fid, query=query)]
+        place_id = PLACE_ID_RE.match(query.strip())
+        if place_id:
+            if not self.places:
+                raise ValueError("place IDs need GOOGLE_PLACES_API_KEY (official Places API)")
+            place = await self.places.details(place_id.group(1), language=language)
+            place.query = query
+            return [place]
         return await self.search(query, language=language, region=region, limit=limit)
 
     async def iter_review_pages(self, feature_id: str, sort: str = "most_relevant",

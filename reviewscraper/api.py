@@ -6,6 +6,8 @@ Endpoints:
 
 * ``GET /maps/reviews-v3`` - places with their reviews (``reviews_data``)
 * ``GET /maps/search-v3``  - places for a text query
+* ``GET /places/autocomplete`` - business suggestions while typing (official Places API)
+* ``GET /places/details``  - one suggestion resolved to a place with its ``google_id``
 * ``GET /requests/{id}``   - result of an async request
 * ``GET /requests``        - running or finished requests
 * ``GET /health``
@@ -26,6 +28,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 
 from .jobs import JobStore
 from .providers.google_maps import SORTS, GoogleMaps
+from .providers.places import PlacesAPI, PlacesAPIError
 
 log = logging.getLogger("reviewscraper.api")
 
@@ -59,6 +62,7 @@ def create_app(maps: GoogleMaps | None = None, db_path: str | None = None,
         app.state.maps = maps or GoogleMaps(
             min_delay=float(os.environ.get("REVIEWSCRAPER_MIN_DELAY", "1")),
             max_delay=float(os.environ.get("REVIEWSCRAPER_MAX_DELAY", "3")),
+            places=PlacesAPI.from_env(),
         )
         app.state.jobs = jobs or JobStore(
             path=db_path or os.environ.get("REVIEWSCRAPER_DB", "reviewscraper.db"),
@@ -156,6 +160,32 @@ def create_app(maps: GoogleMaps | None = None, db_path: str | None = None,
             return out
 
         return await dispatch(request, "maps/search-v3", query, work, is_async, webhook)
+
+    def places_api(request: Request) -> PlacesAPI:
+        places = request.app.state.maps.places
+        if places is None:
+            raise HTTPException(status_code=501, detail="GOOGLE_PLACES_API_KEY is not configured")
+        return places
+
+    @app.get("/places/autocomplete", dependencies=[Depends(require_key)])
+    async def places_autocomplete(request: Request, input: str = Query(..., min_length=1),
+                                  language: str = "en", region: str | None = None,
+                                  sessionToken: str | None = None) -> dict[str, Any]:
+        try:
+            suggestions = await places_api(request).autocomplete(
+                input, language=language, region=region, session_token=sessionToken)
+        except PlacesAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        return {"data": suggestions}
+
+    @app.get("/places/details", dependencies=[Depends(require_key)])
+    async def places_details(request: Request, placeId: str, language: str = "en",
+                             sessionToken: str | None = None) -> dict[str, Any]:
+        try:
+            place = await places_api(request).details(placeId, language=language, session_token=sessionToken)
+        except PlacesAPIError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        return {"data": place.as_dict()}
 
     @app.get("/requests/{request_id}", name="get_request", dependencies=[Depends(require_key)])
     async def get_request(request: Request, request_id: str) -> dict[str, Any]:
