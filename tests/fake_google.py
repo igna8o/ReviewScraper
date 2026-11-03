@@ -31,8 +31,10 @@ def review_record(i: int, rating: int, millis: int, text: str = "Great place") -
     record: list = [None] * 28
     record[1] = rating
     record[2] = [f"{i} weeks ago", None, str(millis)]
-    record[3] = [f"Author {i}", None, f"https://www.google.com/maps/contrib/10{i}?hl=en", 12, 3]
+    record[3] = [f"Author {i}", f"https://lh3.example/a{i}.png", f"https://www.google.com/maps/contrib/10{i}?hl=en", 12, 3]
     record[5] = f"review-{i}"
+    record[12] = f"https://www.google.com/maps/reviews/data=review-{i}"
+    record[14] = [[f"https://lh3.example/p{i}.jpg", "", "report-link", "photo-id", 1.3, None, "a month ago"]]
     record[26] = "en"
     record[27] = text
     return record

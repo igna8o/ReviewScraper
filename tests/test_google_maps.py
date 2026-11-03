@@ -29,9 +29,11 @@ def test_parse_review_page_reads_fields():
     assert token == "next-token"
     assert reviews == [{
         "review_id": "review-1",
+        "review_link": "https://www.google.com/maps/reviews/data=review-1",
         "author_title": "Author 1",
         "author_id": "101",
         "author_link": "https://www.google.com/maps/contrib/101?hl=en",
+        "author_image": "https://lh3.example/a1.png",
         "author_reviews_count": 12,
         "author_photos_count": 3,
         "review_text": "Nice & tasty\nWould return",
@@ -40,6 +42,7 @@ def test_parse_review_page_reads_fields():
         "review_datetime_utc": "09/21/2026 14:13:20",
         "review_relative_time": "1 weeks ago",
         "review_language": "en",
+        "review_img_urls": ["https://lh3.example/p1.jpg"],
         "review_pagination_id": "next-token",
     }]
 

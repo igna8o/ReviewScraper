@@ -167,11 +167,15 @@ def _review_from_record(record: list, page_token: str) -> dict[str, Any]:
     timestamp = millis // 1000 if millis else None
     text = _str(record, 27)
     text = html.unescape(text.replace("<br>", "\n"))
+    photos = dig(record, 14)
+    photo_urls = [p[0] for p in photos if isinstance(p, list) and p and isinstance(p[0], str)] if isinstance(photos, list) else []
     return {
         "review_id": _str(record, 5),
+        "review_link": _str(record, 12),
         "author_title": _str(record, 3, 0),
         "author_id": contrib.group(1) if contrib else "",
         "author_link": author_link,
+        "author_image": _str(record, 3, 1),
         "author_reviews_count": _int(record, 3, 3),
         "author_photos_count": _int(record, 3, 4),
         "review_text": text,
@@ -184,6 +188,7 @@ def _review_from_record(record: list, page_token: str) -> dict[str, Any]:
         ),
         "review_relative_time": _str(record, 2, 0),
         "review_language": _str(record, 26),
+        "review_img_urls": photo_urls,
         # Token of the page after this one: pass it as last_pagination_id to
         # continue after this review's page.
         "review_pagination_id": page_token,

@@ -5,10 +5,13 @@ API de Outscraper (`/maps/reviews-v3`, `/requests/{id}`, `X-API-KEY`, modo
 asíncrono y webhooks). Se puede usar de tres formas: como servidor HTTP, como
 librería de Python o desde la línea de comandos.
 
-> **Estado:** las pruebas automáticas pasan contra un Google simulado. Todavía
-> **no se ha probado contra Google de verdad** (el entorno donde se escribió no
-> tenía acceso a google.com). Antes de depender de ello, ejecuta
-> `pytest -m live` (ver abajo).
+> **Estado (3‑nov‑2026):**
+> - **Reseñas: probado contra Google de verdad.** Dos páginas seguidas, 20
+>   reseñas distintas en el orden pedido, con todos los campos de abajo.
+> - **Búsqueda por nombre: sin probar.** Desde servidores en la nube Google
+>   responde con un CAPTCHA (HTTP 429). Desde una conexión de casa debería
+>   funcionar, pero no está comprobado. Mientras tanto, pasa el enlace de Google
+>   Maps o el feature ID (`0x...:0x...`) en lugar del nombre.
 
 ## Cómo funciona
 
@@ -90,10 +93,11 @@ Parámetros de `/maps/reviews-v3` (mismos nombres que Outscraper):
 | `async` | true | `false` espera el resultado |
 | `webhook` | — | URL que recibe un POST `{id, status, results_location, quantity}` al terminar |
 
-Campos de cada reseña: `review_id`, `author_title`, `author_id`, `author_link`,
-`author_reviews_count`, `author_photos_count`, `review_text`, `review_rating`,
-`review_timestamp`, `review_datetime_utc`, `review_relative_time`,
-`review_language`, `review_pagination_id`.
+Campos de cada reseña: `review_id`, `review_link`, `author_title`, `author_id`,
+`author_link`, `author_image`, `author_reviews_count`, `author_photos_count`,
+`review_text`, `review_rating`, `review_timestamp`, `review_datetime_utc`,
+`review_relative_time`, `review_language`, `review_img_urls`,
+`review_pagination_id`.
 
 Los resultados se guardan en SQLite y se borran 2 horas después de terminar.
 
@@ -159,6 +163,8 @@ pytest -m live    # contra Google de verdad (necesita internet)
 - Solo Google Maps. Outscraper también cubre Yelp, Tripadvisor, Trustpilot,
   Google Play, App Store, Amazon y otros. Cada fuente sería un módulo nuevo en
   `reviewscraper/providers/`.
+- Todavía no se lee la respuesta del dueño: la reseña de prueba no tenía
+  ninguna, así que no se sabe en qué posición viene. Tampoco los "me gusta".
 - Los lugares solo traen nombre y feature ID: todavía no se leen la dirección,
   la valoración media ni el teléfono de la respuesta de búsqueda.
 - `place_id` (`ChIJ...`) no se resuelve. Usa el nombre, la URL o el feature ID.
