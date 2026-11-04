@@ -161,6 +161,13 @@ def create_app(maps: GoogleMaps | None = None, db_path: str | None = None,
 
         return await dispatch(request, "maps/search-v3", query, work, is_async, webhook)
 
+    def places_error(exc: PlacesAPIError) -> HTTPException:
+        # A bad place id or input is the caller's mistake; a bad key, quota or
+        # outage on Google's side is ours, so it stays a 502.
+        if exc.status_code in (400, 404):
+            return HTTPException(status_code=exc.status_code, detail=str(exc))
+        return HTTPException(status_code=502, detail=str(exc))
+
     def places_api(request: Request) -> PlacesAPI:
         places = request.app.state.maps.places
         if places is None:
@@ -175,7 +182,7 @@ def create_app(maps: GoogleMaps | None = None, db_path: str | None = None,
             suggestions = await places_api(request).autocomplete(
                 input, language=language, region=region, session_token=sessionToken)
         except PlacesAPIError as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
+            raise places_error(exc)
         return {"data": suggestions}
 
     @app.get("/places/details", dependencies=[Depends(require_key)])
@@ -184,7 +191,7 @@ def create_app(maps: GoogleMaps | None = None, db_path: str | None = None,
         try:
             place = await places_api(request).details(placeId, language=language, session_token=sessionToken)
         except PlacesAPIError as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
+            raise places_error(exc)
         return {"data": place.as_dict()}
 
     @app.get("/requests/{request_id}", name="get_request", dependencies=[Depends(require_key)])

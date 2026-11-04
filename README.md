@@ -5,10 +5,13 @@ API de Outscraper (`/maps/reviews-v3`, `/requests/{id}`, `X-API-KEY`, modo
 asíncrono y webhooks). Se puede usar de tres formas: como servidor HTTP, como
 librería de Python o desde la línea de comandos.
 
-> **Estado (3‑nov‑2026):**
+> **Estado (4‑nov‑2026):**
 > - **Reseñas: probado contra Google de verdad.** Dos páginas seguidas, 20
 >   reseñas distintas en el orden pedido, con todos los campos de abajo.
-> - **Búsqueda por nombre: sin probar.** Desde servidores en la nube Google
+> - **Places API: probada con una clave real.** `/places/autocomplete` y
+>   `/places/details` con el Empire State Building; el CID de `googleMapsUri`
+>   convertido a `0x0:0x...` devuelve reseñas reales (`pytest -m live`).
+> - **Búsqueda por nombre con scraping: sin probar.** Desde servidores en la nube Google
 >   responde con un CAPTCHA (HTTP 429). Desde una conexión de casa debería
 >   funcionar, pero no está comprobado. Mientras tanto, pasa el enlace de Google
 >   Maps o el feature ID (`0x...:0x...`) en lugar del nombre.

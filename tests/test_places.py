@@ -55,6 +55,9 @@ class FakePlaces:
                 "googleMapsUri": f"https://maps.google.com/?cid={CID}",
                 "rating": 4.7, "userRatingCount": 98000,
             })
+        if request.url.raw_path.startswith(b"/v1/places/bad"):
+            return httpx.Response(400, json={"error": {"code": 400, "status": "INVALID_ARGUMENT",
+                                                       "message": "The provided Place ID: bad is not valid.\n"}})
         return httpx.Response(404, json={})
 
 
@@ -103,3 +106,29 @@ def test_places_endpoints_need_key(tmp_path, monkeypatch):
     maps = GoogleMaps(http=GoogleHTTP(transport=FakeGoogle([[]]).transport()))
     with TestClient(create_app(maps=maps, jobs=JobStore(str(tmp_path / "j.db")))) as c:
         assert c.get("/places/autocomplete", params={"input": "x"}).status_code == 501
+
+
+def test_details_bad_place_id_is_a_client_error(client):
+    r = client.get("/places/details", params={"placeId": "bad"})
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Places API HTTP 400: The provided Place ID: bad is not valid."
+
+
+def test_details_escapes_place_id_in_path():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.raw_path)
+        return httpx.Response(404, json={})
+
+    async def run():
+        api = PlacesAPI(api_key="k", transport=httpx.MockTransport(handler))
+        try:
+            await api.details("a/b?x=1")
+        except Exception:
+            pass
+        await api.aclose()
+
+    import asyncio
+    asyncio.run(run())
+    assert seen[0].startswith(b"/v1/places/a%2Fb%3Fx%3D1?")

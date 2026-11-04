@@ -20,7 +20,7 @@ El cliente conecta su negocio **sin hacer trabajo**:
 |---|---|
 | Leer reseñas de Google por feature ID o por CID (`0x0:0x<cid>`) | **Probado en vivo** |
 | Enlaces `maps.google.com/?cid=...` como entrada | **Probado en vivo** |
-| Autocompletado y detalles con la API oficial de Places | Probado solo con simulación; falta probarlo con una clave real |
+| Autocompletado y detalles con la API oficial de Places | **Probado en vivo** (4‑nov‑2026): Empire State Building → `place_id` → CID → `0x0:0x...` → reseñas reales |
 | Búsqueda por nombre con scraping (`/maps/search-v3`) | **No usar.** Desde servidores en la nube Google responde con CAPTCHA |
 | Google Business Profile API (opción B) | No implementado aquí; se hace en el dashboard (sección 5) |
 
@@ -228,7 +228,8 @@ GET /maps/reviews-v3?query=<google_id>&reviewsLimit=0&sort=newest&cutoff=<last_r
 |---|---|---|
 | `errorMessage` contiene `FormatChanged` | Google cambió el formato de su respuesta | Alerta interna. Hay que actualizar el parser; los datos ya guardados no se pierden |
 | `HTTP 429` o `HTTP 403` | Google limita la IP del servidor | Reintenta más tarde con espera creciente. Si se repite, configura `REVIEWSCRAPER_PROXY` |
-| `Places API HTTP 4xx` | Clave mal configurada o cuota agotada | Revisa la clave y la cuota en Google Cloud |
+| `Places API HTTP 400/404` (el endpoint devuelve 400/404) | `placeId` o texto inválido | Corrige lo que envía el cliente |
+| `Places API HTTP 403/429` (el endpoint devuelve 502) | Clave mal configurada o cuota agotada | Revisa la clave y la cuota en Google Cloud |
 
 Guarda el error en `businesses.sync_error`. Al cliente muéstrale un mensaje
 genérico como "No pudimos actualizar tus reseñas; lo reintentaremos".

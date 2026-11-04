@@ -6,9 +6,9 @@ Place Details returns ``googleMapsUri`` (``https://maps.google.com/?cid=...``),
 and the CID becomes the feature ID the review endpoint accepts.
 
 Needs ``GOOGLE_PLACES_API_KEY`` with "Places API (New)" enabled in Google
-Cloud. Request and response shapes follow Google's documentation for
-``places:autocomplete`` and ``places/{id}``; they were not tested live from
-the environment this was written in.
+Cloud. Verified live on 2026-11-04 with a real key: autocomplete and details
+for the Empire State Building, and the resulting ``0x0:0x...`` feature ID
+returns real reviews (``pytest -m live``).
 
 Pass the same ``session_token`` (any UUID) to the autocomplete calls and the
 final details call of one search so Google bills them as one session.
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -28,7 +29,9 @@ DETAILS_FIELDS = "id,displayName,formattedAddress,googleMapsUri,rating,userRatin
 
 
 class PlacesAPIError(RuntimeError):
-    pass
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class PlacesAPI:
@@ -50,7 +53,11 @@ class PlacesAPI:
     @staticmethod
     def _check(response: httpx.Response) -> dict[str, Any]:
         if response.status_code != 200:
-            raise PlacesAPIError(f"Places API HTTP {response.status_code}: {response.text[:300]}")
+            try:
+                detail = response.json()["error"]["message"].strip()
+            except (ValueError, KeyError, TypeError, AttributeError):
+                detail = response.text[:300]
+            raise PlacesAPIError(f"Places API HTTP {response.status_code}: {detail}", response.status_code)
         return response.json()
 
     async def autocomplete(self, text: str, language: str = "en", region: str | None = None,
@@ -82,7 +89,7 @@ class PlacesAPI:
         if session_token:
             params["sessionToken"] = session_token
         data = self._check(await self._client.get(
-            f"/places/{place_id}", params=params, headers={"X-Goog-FieldMask": DETAILS_FIELDS}))
+            f"/places/{quote(place_id, safe='')}", params=params, headers={"X-Goog-FieldMask": DETAILS_FIELDS}))
         maps_uri = data.get("googleMapsUri", "")
         match = CID_RE.search(maps_uri)
         if not match:
