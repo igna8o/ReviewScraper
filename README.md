@@ -182,3 +182,7 @@ pytest -m live    # contra Google de verdad (necesita internet)
 - Los lugares solo traen nombre y feature ID: todavía no se leen la dirección,
   la valoración media ni el teléfono de la respuesta de búsqueda.
 - No hay reintentos con rotación de proxies ni panel web.
+
+## Licencia
+
+[MIT](LICENSE) © 2026 igna8o.
