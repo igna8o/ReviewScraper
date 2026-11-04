@@ -184,6 +184,13 @@ Haz dos peticiones:
 Usa `query=<google_id>` y no el `place_id`. Así te ahorras una llamada de pago a
 Places en cada sincronización.
 
+El campo `name` (y `full_address`, `rating`, `reviews`) de la respuesta sale
+vacío con un `google_id` si el servidor nunca ha visto ese negocio: Places no
+puede buscar por CID ni por `0x0:0x...`. Tras llamar a `/places/details` una
+vez, el servidor lo recuerda 30 días (en `REVIEWSCRAPER_DB`, así que sobrevive a
+reinicios) y las consultas por `google_id` o por enlace `?cid=` ya los incluyen.
+Guarda tú también el nombre en tu base de datos, que es la fuente fiable.
+
 Un negocio con miles de reseñas tarda minutos: son 10 reseñas por página, con
 1 a 3 segundos de espera entre páginas. En la interfaz, muestra "Importando
 reseñas…" mientras tanto.

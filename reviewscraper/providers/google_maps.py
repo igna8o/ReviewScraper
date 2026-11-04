@@ -22,6 +22,7 @@ the parser raises ``FormatChanged`` instead of returning an empty result.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import html
 import json
 import random
@@ -286,6 +287,10 @@ class GoogleMaps:
                       region: str | None = None, limit: int = 1) -> list[Place]:
         fid = resolve_feature_id(query)
         if fid:
+            # Name, address and rating from an earlier /places/details, if any.
+            known = self.places.cache.get(fid) if self.places and self.places.cache else None
+            if known:
+                return [dataclasses.replace(known, query=query)]
             return [Place(google_id=fid, query=query)]
         place_id = PLACE_ID_RE.match(query.strip())
         if place_id:

@@ -13,7 +13,7 @@ import os
 import pytest
 
 from reviewscraper.providers.google_maps import GoogleMaps
-from reviewscraper.providers.places import PlacesAPI
+from reviewscraper.providers.places import PlaceCache, PlacesAPI
 
 pytestmark = pytest.mark.live
 
@@ -53,7 +53,7 @@ async def test_live_places_to_reviews():
     checks that the CID in ``googleMapsUri`` converted to ``0x0:0x...`` is
     accepted by the review endpoint and returns real reviews.
     """
-    places = PlacesAPI()
+    places = PlacesAPI(cache=PlaceCache())
     maps = GoogleMaps(min_delay=1, max_delay=2)
     try:
         suggestions = await places.autocomplete("Empire State Building", region="us")
@@ -66,7 +66,11 @@ async def test_live_places_to_reviews():
         assert place.google_id.split(":")[1] == FEATURE_ID.split(":")[1]
         assert place.rating and place.reviews and place.reviews > 1000
 
-        reviews = await maps.reviews(place.google_id, reviews_limit=10, sort="newest")
+        # A later request that only has the 0x0:0x... ID still gets the name.
+        maps.places = places
+        [by_fid] = await maps.place_reviews([place.google_id], reviews_limit=10, sort="newest")
+        assert by_fid["name"] == "Empire State Building"
+        reviews = by_fid["reviews_data"]
     finally:
         await places.aclose()
         await maps.aclose()

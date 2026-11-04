@@ -119,7 +119,7 @@ Los resultados se guardan en SQLite y se borran 2 horas después de terminar.
 | Variable | Por defecto |
 |---|---|
 | `REVIEWSCRAPER_API_KEYS` | vacía = sin autenticación (solo para uso local) |
-| `REVIEWSCRAPER_DB` | `reviewscraper.db` |
+| `REVIEWSCRAPER_DB` | `reviewscraper.db` (también guarda 30 días lo que devuelve `/places/details`, para rellenar `name` al consultar por `0x0:0x...`) |
 | `REVIEWSCRAPER_RESULT_TTL` | `7200` segundos |
 | `REVIEWSCRAPER_CONCURRENCY` | `4` peticiones a la vez |
 | `REVIEWSCRAPER_MIN_DELAY` / `MAX_DELAY` | `1` / `3` segundos entre páginas |

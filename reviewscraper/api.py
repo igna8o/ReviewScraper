@@ -59,13 +59,14 @@ def create_app(maps: GoogleMaps | None = None, db_path: str | None = None,
                jobs: JobStore | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        db_file = db_path or os.environ.get("REVIEWSCRAPER_DB", "reviewscraper.db")
         app.state.maps = maps or GoogleMaps(
             min_delay=float(os.environ.get("REVIEWSCRAPER_MIN_DELAY", "1")),
             max_delay=float(os.environ.get("REVIEWSCRAPER_MAX_DELAY", "3")),
-            places=PlacesAPI.from_env(),
+            places=PlacesAPI.from_env(db_file),
         )
         app.state.jobs = jobs or JobStore(
-            path=db_path or os.environ.get("REVIEWSCRAPER_DB", "reviewscraper.db"),
+            path=db_file,
             ttl=float(os.environ.get("REVIEWSCRAPER_RESULT_TTL", str(2 * 3600))),
             max_concurrency=int(os.environ.get("REVIEWSCRAPER_CONCURRENCY", "4")),
         )

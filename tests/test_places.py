@@ -8,7 +8,7 @@ from reviewscraper.api import create_app
 from reviewscraper.http import GoogleHTTP
 from reviewscraper.jobs import JobStore
 from reviewscraper.providers.google_maps import GoogleMaps, cid_to_feature_id, resolve_feature_id
-from reviewscraper.providers.places import PlacesAPI
+from reviewscraper.providers.places import PlaceCache, PlacesAPI
 
 from .fake_google import FakeGoogle, review_record
 
@@ -65,7 +65,7 @@ class FakePlaces:
 def client(tmp_path, monkeypatch):
     monkeypatch.delenv("REVIEWSCRAPER_API_KEYS", raising=False)
     fake_places = FakePlaces()
-    places = PlacesAPI(api_key="k", transport=httpx.MockTransport(fake_places.handler))
+    places = PlacesAPI(api_key="k", transport=httpx.MockTransport(fake_places.handler), cache=PlaceCache())
     fake = FakeGoogle([[review_record(1, 5, 1_790_000_000_000)]])
     maps = GoogleMaps(http=GoogleHTTP(transport=fake.transport(), retries=0),
                       min_delay=0, max_delay=0, places=places)
@@ -132,3 +132,30 @@ def test_details_escapes_place_id_in_path():
     import asyncio
     asyncio.run(run())
     assert seen[0].startswith(b"/v1/places/a%2Fb%3Fx%3D1?")
+
+
+@pytest.mark.parametrize("query", [FID, f"https://maps.google.com/?cid={CID}"])
+def test_feature_id_query_gets_name_from_earlier_details(client, query):
+    def reviews():
+        params = {"query": query, "async": "false"}
+        [place] = client.get("/maps/reviews-v3", params=params).json()["data"]
+        return place
+
+    assert reviews()["name"] == ""  # nothing known about this place yet
+    client.get("/places/details", params={"placeId": "ChIJaXQRs6lZwokRY6EFpJnhNNE"})
+    place = reviews()
+    assert place["name"] == "Empire State Building"
+    assert place["query"] == query and place["google_id"] == FID
+    assert place["full_address"].startswith("20 W 34th")
+    assert (place["rating"], place["reviews"]) == (4.7, 98000)
+    assert len(place["reviews_data"]) == 1
+
+
+def test_place_cache_expires(monkeypatch):
+    from reviewscraper.providers.google_maps import Place
+    cache = PlaceCache(ttl=10)
+    cache.put(Place(google_id=FID, name="X"))
+    assert cache.get(FID).name == "X"
+    now = __import__("time").time()
+    monkeypatch.setattr("reviewscraper.providers.places.time.time", lambda: now + 11)
+    assert cache.get(FID) is None
