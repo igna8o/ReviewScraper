@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import sqlite3
 import time
 import uuid
@@ -23,12 +24,24 @@ log = logging.getLogger("reviewscraper.jobs")
 PENDING, SUCCESS, ERROR = "Pending", "Success", "Error"
 
 
+def connect_sqlite(path: str) -> sqlite3.Connection:
+    """Open ``path``, creating its folder first.
+
+    Cloud Run and other hosts ignore the image's ``VOLUME`` and do not create
+    ``/data``; without this the server exits at startup.
+    """
+    folder = os.path.dirname(path)
+    if path != ":memory:" and folder:
+        os.makedirs(folder, exist_ok=True)
+    return sqlite3.connect(path, check_same_thread=False)
+
+
 class JobStore:
     def __init__(self, path: str = "reviewscraper.db", ttl: float = 2 * 3600,
                  max_concurrency: int = 4,
                  webhook_transport: httpx.AsyncBaseTransport | None = None):
         self.ttl = ttl
-        self._db = sqlite3.connect(path, check_same_thread=False)
+        self._db = connect_sqlite(path)
         self._db.execute(
             """CREATE TABLE IF NOT EXISTS requests (
                 id TEXT PRIMARY KEY,

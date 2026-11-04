@@ -19,13 +19,13 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
-import sqlite3
 import time
 from typing import Any
 from urllib.parse import quote
 
 import httpx
 
+from ..jobs import connect_sqlite
 from .google_maps import CID_RE, Place, cid_to_feature_id
 
 PLACES_URL = "https://places.googleapis.com/v1"
@@ -50,7 +50,7 @@ class PlaceCache:
 
     def __init__(self, path: str = ":memory:", ttl: float = 30 * 86400):
         self.ttl = ttl
-        self._db = sqlite3.connect(path, check_same_thread=False)
+        self._db = connect_sqlite(path)
         self._db.execute("CREATE TABLE IF NOT EXISTS places ("
                          "google_id TEXT PRIMARY KEY, data TEXT NOT NULL, saved_at REAL NOT NULL)")
         self._db.commit()

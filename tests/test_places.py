@@ -159,3 +159,9 @@ def test_place_cache_expires(monkeypatch):
     now = __import__("time").time()
     monkeypatch.setattr("reviewscraper.providers.places.time.time", lambda: now + 11)
     assert cache.get(FID) is None
+
+
+def test_place_cache_creates_missing_folder(tmp_path):
+    path = tmp_path / "no" / "existe" / "r.db"
+    PlaceCache(str(path)).close()
+    assert path.exists()
